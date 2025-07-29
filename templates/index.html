@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分配标注任务 🎯</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f2f5; margin: 0; }
+        .container { text-align: center; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        .form-group { margin: 20px 0; }
+        input[type="number"] { padding: 10px; width: 80px; text-align: center; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #0056b3; }
+        p { color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 欢迎来到标注平台 🎯</h1>
+        <p>当前共有 <strong>{{ total_items }}</strong> 条数据待标注。</p>
+        <form id="taskForm" onsubmit="startAnnotation(event)">
+            <div class="form-group">
+                <label for="start">标注ID范围：</label>
+                <input type="number" id="start" name="start" required min="1" max="{{ total_items }}">
+                <span>-</span>
+                <input type="number" id="end" name="end" required min="1" max="{{ total_items }}">
+            </div>
+            <button type="submit">🚀 开始标注</button>
+        </form>
+    </div>
+
+    <script>
+        function startAnnotation(event) {
+            event.preventDefault();
+            const start = document.getElementById('start').value;
+            const end = document.getElementById('end').value;
+            if (parseInt(start) > parseInt(end)) {
+                alert('开始ID不能大于结束ID！');
+                return;
+            }
+            // 跳转到标注页面，并携带参数
+            window.location.href = `/annotate?start=${start}&end=${end}`;
+        }
+    </script>
+</body>
+</html>

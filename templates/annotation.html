@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正在标注... </title>
+    <style>
+        body { font-family: sans-serif; background-color: #f8f9fa; color: #333; margin: 0; padding: 20px; }
+        .main-container { display: flex; gap: 20px; max-width: 1400px; margin: auto; }
+        .image-container { flex: 1; text-align: center; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .image-container img { max-width: 100%; max-height: 500px; border-radius: 8px; }
+        .annotation-container { flex: 1; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .form-field { margin-bottom: 15px; }
+        .form-field label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input[type="text"], textarea, select { width: 95%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px;font-family: inherit; }
+        textarea { height: 100px; resize: vertical; }
+        #answer { height: 60px; }
+        .nav-buttons { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .status { font-weight: bold; }
+        button { padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background-color 0.2s; }
+        button:hover { opacity: 0.9; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #prevBtn { background-color: #ffc107; }
+        #nextBtn { background-color: #17a2b8; }
+        #saveStatus { margin-left: 20px; color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="image-container">
+            <h2 id="image-title">🖼️ 图像 (ID: -)</h2>
+            <img id="image-display" src="" alt="待加载图像...">
+        </div>
+        <div class="annotation-container">
+            <h2>✍️ 标注信息</h2>
+            
+            <div class="form-field">
+                <label for="question">Prompt (问题)</label>
+                <input type="text" id="question" placeholder="请输入问题...">
+            </div>
+
+            <div class="form-field">
+                <label for="answer">Answer (答案文本)</label>
+                <textarea id="answer" placeholder="请输入对应的答案..."></textarea>
+            </div>
+
+            <div class="form-field">
+                <label for="justification">Justification (可修改)</label>
+                <textarea id="justification"></textarea>
+            </div>
+
+            <div class="form-field">
+                <label for="optimal_path">Optimal Path (可修改)</label>
+                <select id="optimal_path">
+                    <option value="parallel">parallel</option>
+                    <option value="sequential">sequential</option>
+                    <option value="direct">direct</option>
+                </select>
+            </div>
+
+            <div class="nav-buttons">
+                <button id="prevBtn" onclick="navigate(-1)">⬅️ 上一条</button>
+                <span id="progress" class="status">-- / --</span>
+                <button id="nextBtn" onclick="navigate(1)">下一条 ➡️</button>
+            </div>
+            
+            <div class="nav-buttons" style="justify-content: center;">
+                 <button id="saveBtn" onclick="saveCurrent()">💾 保存</button>
+                 <span id="saveStatus"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    {% raw %}
+        let allData = [];
+        let currentIndex = 0;
+
+        window.onload = async () => {
+            const params = new URLSearchParams(window.location.search);
+            const start = params.get('start');
+            const end = params.get('end');
+
+            if (!start || !end) {
+                document.body.innerHTML = '<h1>错误：缺少任务范围参数。请返回主页。</h1>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/data?start=${start}&end=${end}`);
+                if (!response.ok) throw new Error('无法加载数据');
+                allData = await response.json();
+                if (allData.length > 0) {
+                    loadItem(currentIndex);
+                } else {
+                    document.body.innerHTML = '<h1>该范围内没有数据！</h1>';
+                }
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                alert('加载数据失败，请检查后台服务是否开启。');
+            }
+        };
+
+        function loadItem(index) {
+            const item = allData[index];
+            if (!item) return;
+
+            document.getElementById('image-title').innerText = `🖼️ 图像 (ID: ${item.id})`;
+            document.getElementById('image-display').src = `/static/${item.image.path}`;
+            
+            const isNewFormat = 'prompt' in item;
+
+            if (isNewFormat) {
+                document.getElementById('question').value = item.prompt[0].content;
+                
+                const answerLetter = item.answer;
+                const answerMap = {'A':1, 'B':2, 'C':3, 'D':4, 'E':5, 'F':6};
+                const answerKey = `option${answerMap[answerLetter]}`;
+                document.getElementById('answer').value = item[answerKey];
+                
+                document.getElementById('justification').value = item.extra_info.justification;
+                document.getElementById('optimal_path').value = item.extra_info.optimal_path;
+
+            } else {
+                document.getElementById('question').value = '';
+                document.getElementById('answer').value = '';
+                document.getElementById('justification').value = item.extra_info.justification;
+                document.getElementById('optimal_path').value = item.extra_info.optimal_path;
+            }
+
+            document.getElementById('progress').innerText = `${index + 1} / ${allData.length}`;
+            document.getElementById('prevBtn').disabled = (index === 0);
+            document.getElementById('nextBtn').disabled = (index === allData.length - 1);
+            
+            document.getElementById('saveStatus').innerText = '';
+        }
+
+        function navigate(direction) {
+            const newIndex = currentIndex + direction;
+            if (newIndex >= 0 && newIndex < allData.length) {
+                currentIndex = newIndex;
+                loadItem(currentIndex);
+            }
+        }
+
+        async function saveCurrent() {
+            const item = allData[currentIndex];
+            const saveBtn = document.getElementById('saveBtn');
+            const saveStatus = document.getElementById('saveStatus');
+
+            const dataToSend = {
+                question: document.getElementById('question').value,
+                answer: document.getElementById('answer').value,
+                justification: document.getElementById('justification').value,
+                optimal_path: document.getElementById('optimal_path').value,
+            };
+
+            if (!dataToSend.question || !dataToSend.answer) {
+                alert('“问题”和“答案文本”不能为空！');
+                return;
+            }
+
+            saveBtn.disabled = true;
+            saveStatus.innerText = '正在保存...';
+            
+            try {
+                const response = await fetch(`/api/save/${item.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dataToSend)
+                });
+                
+                const result = await response.json();
+
+                if (!response.ok) throw new Error(result.detail || '保存失败');
+
+                const params = new URLSearchParams(window.location.search);
+                const start = params.get('start');
+                const end = params.get('end');
+                const freshResponse = await fetch(`/api/data?start=${start}&end=${end}`);
+                allData = await freshResponse.json();
+                
+                loadItem(currentIndex); 
+                
+                saveStatus.innerText = result.message;
+                
+            } catch (error) {
+                console.error('保存失败:', error);
+                saveStatus.innerText = `❌ 保存失败: ${error.message}`;
+            } finally {
+                saveBtn.disabled = false;
+                setTimeout(() => { saveStatus.innerText = ''; }, 3000);
+            }
+        }
+    {% endraw %}
+    </script>
+</body>
+</html>
