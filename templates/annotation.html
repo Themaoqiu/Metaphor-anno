@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正在标注... ✍️</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f8f9fa; color: #333; margin: 0; padding: 20px; }
+        .main-container { display: flex; flex-wrap: wrap; gap: 20px; max-width: 1400px; margin: auto; }
+        .image-container { flex: 1; min-width: 400px; text-align: center; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); align-self: flex-start; }
+        .image-container img { max-width: 100%; max-height: 600px; border-radius: 8px; }
+        .annotation-container { flex: 1.5; min-width: 500px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-top: 0; }
+        .header-bar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .header-bar h2 {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin: 0;
+        }
+        .home-btn {
+            display: inline-block;
+            padding: 8px 15px;
+            background-color: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        .home-btn:hover {
+            background-color: #5a6268;
+        }
+        .form-field { margin-bottom: 18px; }
+        .form-field label { display: block; font-weight: bold; margin-bottom: 6px; color: #343a40; }
+        .form-field .value { white-space: pre-wrap; background-color: #e9ecef; padding: 10px; border-radius: 5px; font-size: 15px; line-height: 1.6; }
+        input[type="text"], textarea, select { width: 98%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; font-family: inherit; }
+        textarea { resize: vertical; line-height: 1.6; }
+        .nav-buttons { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
+        button { padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #saveStatus { margin-left: 20px; color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="image-container">
+            <h2 id="image-title">🖼️ 图像 (ID: -)</h2>
+            <img id="image-display" src="" alt="正在加载图像...">
+        </div>
+        <div class="annotation-container">
+            <div class="header-bar">
+                <a href="/" class="home-btn">🏠 返回主页</a>
+            </div>
+            <div class="nav-buttons" style="margin-bottom: 20px;">
+                <button id="prevBtn" onclick="navigate(-1)">⬅️ 上一条</button>
+                <span id="progress" class="status">-- / --</span>
+                <button id="nextBtn" onclick="navigate(1)">下一条 ➡️</button>
+            </div>
+
+            <div id="display-fields-container"></div>
+            <div id="annotation-fields-container"></div>
+
+            <div class="nav-buttons" style="justify-content: center;">
+                 <button id="saveBtn" onclick="saveCurrent()">💾 保存</button>
+                 <span id="saveStatus"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    {% raw %}
+        let allData = [];
+        let currentIndex = 0;
+        let currentAnnotationFields = [];
+        let currentDataset = ''; 
+
+        window.onload = async () => {
+            const params = new URLSearchParams(window.location.search);
+            currentDataset = params.get('dataset'); 
+            const start = params.get('start');
+            const end = params.get('end');
+
+            if (!currentDataset || !start || !end) {
+                document.body.innerHTML = '<h1>错误：缺少数据集或任务范围，请返回主页</h1>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/data?dataset=${currentDataset}&start=${start}&end=${end}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '无法加载数据');
+                }
+                allData = await response.json();
+                if (allData.length > 0) {
+                    loadItem(currentIndex);
+                } else {
+                    document.body.innerHTML = '<h1>该范围内没有数据！</h1>';
+                }
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                alert(`加载数据失败: ${error.message}`);
+            }
+        };
+
+        function loadItem(index) {
+            const item = allData[index];
+            if (!item) return;
+            
+            currentAnnotationFields = item.annotation_fields;
+
+            document.getElementById('image-title').innerText = `🖼️ 图像 (ID: ${item.id})`;
+            document.getElementById('image-display').src = `/static/${item.image_path}`;
+            
+            const displayContainer = document.getElementById('display-fields-container');
+            const annotationContainer = document.getElementById('annotation-fields-container');
+            displayContainer.innerHTML = '';
+            annotationContainer.innerHTML = '';
+
+            if (item.display_fields.length > 0) {
+                const title = document.createElement('h2');
+                title.innerText = '📋 数据集信息';
+                displayContainer.appendChild(title);
+            }
+            item.display_fields.forEach(field => {
+                const fieldDiv = document.createElement('div');
+                fieldDiv.className = 'form-field';
+                fieldDiv.innerHTML = `<label>${field.label}</label><div class="value">${field.value}</div>`;
+                displayContainer.appendChild(fieldDiv);
+            });
+
+            if (item.annotation_fields.length > 0) {
+                const title = document.createElement('h2');
+                title.innerText = '✍️ 标注与修改';
+                annotationContainer.appendChild(title);
+            }
+            item.annotation_fields.forEach(field => {
+                const fieldDiv = document.createElement('div');
+                fieldDiv.className = 'form-field';
+                let inputElement = '';
+                if (field.type === 'select') {
+                    const optionsHtml = field.options.map(opt => `<option value="${opt}" ${opt === field.value ? 'selected' : ''}>${opt}</option>`).join('');
+                    inputElement = `<select id="field-${field.name}">${optionsHtml}</select>`;
+                } else if (field.type === 'textarea') {
+                    inputElement = `<textarea id="field-${field.name}" rows="5">${field.value}</textarea>`;
+                } else {
+                    inputElement = `<input type="text" id="field-${field.name}" value="${field.value}">`;
+                }
+                fieldDiv.innerHTML = `<label for="field-${field.name}">${field.label}</label>${inputElement}`;
+                annotationContainer.appendChild(fieldDiv);
+            });
+
+            document.getElementById('progress').innerText = `${index + 1} / ${allData.length}`;
+            document.getElementById('prevBtn').disabled = (index === 0);
+            document.getElementById('nextBtn').disabled = (index === allData.length - 1);
+            document.getElementById('saveStatus').innerText = '';
+        }
+
+        function navigate(direction) {
+            const newIndex = currentIndex + direction;
+            if (newIndex >= 0 && newIndex < allData.length) {
+                currentIndex = newIndex;
+                loadItem(currentIndex);
+            }
+        }
+
+        async function saveCurrent() {
+            const item = allData[currentIndex];
+            const saveStatus = document.getElementById('saveStatus');
+
+            const formData = {};
+            currentAnnotationFields.forEach(field => {
+                const element = document.getElementById(`field-${field.name}`);
+                if (element) {
+                    formData[field.name] = element.value;
+                }
+            });
+
+            saveBtn.disabled = true;
+            saveStatus.innerText = '正在保存...';
+            
+            try {
+                const response = await fetch(`/api/save/${item.id}?dataset=${currentDataset}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.detail || '保存失敗');
+                
+                saveStatus.innerText = result.message;
+
+            } catch (error) {
+                console.error('保存失敗:', error);
+                saveStatus.innerText = `❌ 保存失敗: ${error.message}`;
+            } finally {
+                saveBtn.disabled = false;
+                setTimeout(() => { saveStatus.innerText = ''; }, 3000);
+            }
+        }
+    {% endraw %}
+    </script>
+</body>
+</html>

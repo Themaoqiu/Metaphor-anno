@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>标注范围 🎯</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f2f5; margin: 0; }
+        .container { text-align: center; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); min-width: 400px; }
+        h1 { color: #333; }
+        .form-group { margin: 20px 0; }
+        label { font-weight: bold; margin-right: 10px; }
+        input[type="number"], select { padding: 10px; text-align: center; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        select { text-align: left; }
+        input[type="number"] { width: 80px; }
+        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #0056b3; }
+        #item-count { color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Metaphor Annotation 🎯</h1>
+        <form id="taskForm" onsubmit="startAnnotation(event)">
+            <div class="form-group">
+                <label for="dataset">选择数据集:</label>
+                <select id="dataset" name="dataset" onchange="updateMaxRange()">
+                    {% for name, count in dataset_info.items() %}
+                    <option value="{{ name }}" data-count="{{ count }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <p id="item-count">当前数据集共有 <strong>-</strong> 条数据</p>
+            <div class="form-group">
+                <label for="start">标注ID范围:</label>
+                <input type="number" id="start" name="start" required min="1">
+                <span>-</span>
+                <input type="number" id="end" name="end" required min="1">
+            </div>
+            <button type="submit">🚀 开始</button>
+        </form>
+    </div>
+
+    <script>
+        const datasetInfo = {{ dataset_info | tojson }};
+        const datasetSelect = document.getElementById('dataset');
+        const startInput = document.getElementById('start');
+        const endInput = document.getElementById('end');
+        const itemCountP = document.getElementById('item-count');
+
+        function updateMaxRange() {
+            const selectedOption = datasetSelect.options[datasetSelect.selectedIndex];
+            const count = selectedOption.getAttribute('data-count');
+            
+            itemCountP.querySelector('strong').innerText = count;
+            startInput.max = count;
+            endInput.max = count;
+        }
+
+        function startAnnotation(event) {
+            event.preventDefault();
+            const dataset = datasetSelect.value;
+            const start = startInput.value;
+            const end = endInput.value;
+
+            if (!dataset) {
+                alert('请选择一个数据集！');
+                return;
+            }
+            if (parseInt(start) > parseInt(end)) {
+                alert('开始ID不能大于结束ID！');
+                return;
+            }
+            if (parseInt(end) > parseInt(endInput.max)) {
+                alert('结束id超过数据集总数！');
+                return;
+            }
+            window.location.href = `/annotate?dataset=${dataset}&start=${start}&end=${end}`;
+        }
+
+        document.addEventListener('DOMContentLoaded', updateMaxRange);
+    </script>
+</body>
+</html>
