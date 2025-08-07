@@ -114,7 +114,7 @@ class YesbutAdapter(DatasetAdapter):
         base_path = self.record.get("image", {}).get("path", "")
         return {
             "id": self.record.get("id"),
-            "image_path": f"YesBut_images/{base_path}" if base_path else "",
+            "image_path": f"yesbut_images/{base_path}" if base_path else "",
             "display_fields": [
                 {"label": "问题 (Question)", "value": self.record.get("prompt", [{}])[0].get("content", "N/A")},
                 {"label": "选项 (Options)", "value": "\n".join([f"{k[0].upper()}. {v}" for k, v in self.record.items() if k.startswith('option') and v])},
