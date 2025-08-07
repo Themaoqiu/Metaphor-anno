@@ -36,7 +36,7 @@ def load_all_datasets():
             for i, line in enumerate(f):
                 try:
                     item = json.loads(line)
-                    item['id'] = i + 1  # 賦予運行時ID
+                    item['id'] = i + 1  
                     temp_data.append(item)
                 except json.JSONDecodeError:
                     print(f"警告: 文件 {file_path.name} 第 {i+1} 行 JSON 格式錯誤，已跳過。")
@@ -65,7 +65,6 @@ def save_dataset(dataset_name: str):
 def startup_event():
     load_all_datasets()
 
-# --- 路由和端點 ---
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     """渲染主頁，並傳遞所有可用數據集的名稱和記錄數。"""

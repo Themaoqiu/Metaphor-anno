@@ -138,14 +138,49 @@ class YesbutAdapter(DatasetAdapter):
         self.record["extra_info"]["optimal_path"] = form_data.get("optimal_path", "")
         self.record["extra_info"]["justification"] = form_data.get("justification", "")
 
+class VfluteAdapter(QuestionAnswerAdapter):
+    """针对 'V-FLUTE' 数据集的具体适配器。"""
+    def get_display_data(self) -> Dict[str, Any]:
+        extra_info = self.record.get("extra_info", {})
+        base_path = self.record.get("image", {}).get("path", "")
+        
+        return {
+            "id": self.record.get("id"),
+            "image_path": f"vflute_images/{base_path}" if base_path else "",
+            "display_fields": [
+                {"label": "图像解释 (Explanation)", "value": extra_info.get("explanation", "N/A")},
+                {"label": "相关批语 (Claim)", "value": extra_info.get("claim", "N/A")}
+            ],
+            "annotation_fields": [
+                {
+                    "name": "question", "label": "问题 (Prompt)", "type": "textarea",
+                    "value": self.record.get("prompt", [{}])[0].get("content", "")
+                },
+                {
+                    "name": "correct_answer", "label": "正确答案 (Correct Answer Text)", "type": "textarea",
+                    "value": self.record.get("reward_model", {}).get("ground_truth", "")
+                },
+                {
+                    "name": "optimal_path", "label": "理解路径 (Optimal Path)", "type": "select",
+                    "value": extra_info.get("optimal_path", ""),
+                    "options": ["", "parallel", "sequential", "direct"]
+                },
+                {
+                    "name": "justification", "label": "路径解释 (Justification)", "type": "textarea",
+                    "value": extra_info.get("justification", "")
+                }
+            ]
+        }
+
 def get_adapter_for_record(record: Dict[str, Any]) -> DatasetAdapter:
     """檢查記錄中的'data_source'欄位，並返回相應的適配器實例。"""
     data_source = record.get("data_source", "")
     
-    if data_source == "YesBut_Benchmark":
+    if data_source == "V-FLUTE": 
+        return VfluteAdapter(record)
+    elif data_source == "YesBut_Benchmark":
         return YesbutAdapter(record)
     elif data_source == "hummus":
         return HummusAdapter(record)
     else:
-        # 默認使用 MutimmAdapter
         return MutimmAdapter(record)
